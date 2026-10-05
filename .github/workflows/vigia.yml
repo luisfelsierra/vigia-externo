@@ -1,0 +1,22 @@
+name: Vigia externo
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: vigia
+  cancel-in-progress: false
+jobs:
+  conferir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Conferir de fora se o painel responde
+        env:
+          URL: ${{ secrets.URL_PAINEL }}
+          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: bash conferir.sh
