@@ -8,8 +8,14 @@ agora=$(date +%s)
 avisar() { curl -s -m 15 -o /dev/null "https://api.telegram.org/bot$TOKEN/sendMessage" \
   --data-urlencode "chat_id=$CHAT" --data-urlencode "text=$1"; }
 
-ok=0
-for i in 1 2 3; do curl -fsS -m 20 -o /dev/null "$URL" && { ok=1; break; }; sleep 20; done
+# Três tentativas espaçadas (cerca de 2 min no total): uma falha de rede do próprio
+# GitHub ou do DNS dura segundos e não pode virar "servidor caiu" (18/10, 22h02).
+ok=0; motivo=""
+for i in 1 2 3; do
+  codigo=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "$URL" 2>/tmp/erro) && [ "$codigo" = 200 ] && { ok=1; break; }
+  motivo="$(head -c 160 /tmp/erro) HTTP ${codigo:-sem resposta}"
+  [ "$i" -lt 3 ] && sleep 45
+done
 
 read -r situacao desde aviso < estado.txt || true
 situacao=${situacao:-ok}
@@ -18,7 +24,7 @@ if [ "$ok" = 1 ]; then
   [ "$situacao" = fora ] && avisar "✅ Vigia externo: o painel voltou a responder pela internet (ficou fora $(( (agora - desde) / 60 )) min)."
   novo=ok
 elif [ "$situacao" != fora ]; then
-  avisar "🔴 Vigia externo: o painel da Autly NÃO responde pela internet. O SDR da Astro e o atendimento da S Vistorias estão fora do ar. Se não chegou aviso do vigia interno, o servidor inteiro caiu."
+  avisar "🔴 Vigia externo: o painel da Autly NÃO responde pela internet. O SDR da Astro e o atendimento da S Vistorias estão fora do ar. Se não chegou aviso do vigia interno, o servidor inteiro caiu. Detalhe: $motivo"
   novo="fora $agora $agora"
 elif [ $((agora - aviso)) -gt 10800 ]; then
   avisar "🔴 Vigia externo: o painel continua fora do ar (há $(( (agora - desde) / 60 )) min)."
